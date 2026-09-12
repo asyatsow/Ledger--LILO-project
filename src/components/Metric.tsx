@@ -1,0 +1,1 @@
+export function Metric({label,value,detail}:{label:string;value:string;detail:string}){return <div className="card p-5"><div className="text-[10px] tracking-[.16em] text-[#85827a]">{label}</div><div className="mt-2 text-3xl font-black tracking-[-.06em]">{value}</div><div className="mt-1 text-xs text-[#77746c]">{detail}</div></div>}
