@@ -33,6 +33,97 @@ function normalize(value: string) {
     .trim();
 }
 
+/**
+ * Concept-specific pass checks for the offline fallback grader.
+ * Each returns true only when the answer demonstrates the actual
+ * underlying idea (not just a keyword), based on a couple of
+ * independent signals that would be hard to satisfy by accident.
+ */
+function passesFallback(normalized: string, concept: Concept): boolean {
+  switch (concept) {
+    case "off_by_one": {
+      const boundary =
+        normalized.includes("range len") ||
+        normalized.includes("range(len") ||
+        normalized.includes("less than") ||
+        normalized.includes(" < ") ||
+        normalized.includes("<");
+      const reason =
+        normalized.includes("plus 1") ||
+        normalized.includes("+1") ||
+        normalized.includes("one past") ||
+        normalized.includes("past the end") ||
+        normalized.includes("out of range") ||
+        normalized.includes("invalid index") ||
+        normalized.includes("last index") ||
+        normalized.includes("last valid");
+      return boundary && reason;
+    }
+    case "null_handling": {
+      const mentionsNull =
+        normalized.includes("null") ||
+        normalized.includes("none") ||
+        normalized.includes("undefined");
+      const mentionsGuard =
+        normalized.includes("check") ||
+        normalized.includes("guard") ||
+        normalized.includes("before accessing") ||
+        normalized.includes("if not") ||
+        normalized.includes("exists");
+      return mentionsNull && mentionsGuard;
+    }
+    case "scope_error": {
+      const mentionsScope =
+        normalized.includes("scope") ||
+        normalized.includes("not accessible") ||
+        normalized.includes("not available") ||
+        normalized.includes("out of scope");
+      const mentionsFix =
+        normalized.includes("pass") ||
+        normalized.includes("return") ||
+        normalized.includes("global") ||
+        normalized.includes("nonlocal") ||
+        normalized.includes("parameter") ||
+        normalized.includes("argument");
+      return mentionsScope && mentionsFix;
+    }
+    case "type_mismatch": {
+      const mentionsType =
+        normalized.includes("type") ||
+        normalized.includes("string") ||
+        normalized.includes("integer") ||
+        normalized.includes("int ") ||
+        normalized.includes("str ");
+      const mentionsFix =
+        normalized.includes("convert") ||
+        normalized.includes("cast") ||
+        normalized.includes("parse") ||
+        normalized.includes("check the type") ||
+        normalized.includes("incompatible");
+      return mentionsType && mentionsFix;
+    }
+    case "logic_error": {
+      const mentionsBehavior =
+        normalized.includes("condition") ||
+        normalized.includes("intended") ||
+        normalized.includes("should") ||
+        normalized.includes("wrong direction") ||
+        normalized.includes("opposite");
+      const mentionsRunsFine =
+        normalized.includes("no error") ||
+        normalized.includes("runs") ||
+        normalized.includes("no crash") ||
+        normalized.includes("valid syntax") ||
+        normalized.includes("wrong result") ||
+        normalized.includes("wrong behavior") ||
+        normalized.includes("wrong condition");
+      return mentionsBehavior && mentionsRunsFine;
+    }
+    default:
+      return false;
+  }
+}
+
 /*
  * This fallback exists for when Claude is unavailable.
  *
@@ -58,6 +149,20 @@ function fallbackGrade(
         "Think back to the bug you originally logged. What was the AI fix changing?",
       next_step:
         "Give your best explanation, even if you're not completely sure.",
+    };
+  }
+
+  if (passesFallback(normalized, concept)) {
+    return {
+      passed: true,
+      what_you_got: `You connected the mechanism and the reason clearly for ${concept.replace(
+        /_/g,
+        " "
+      )}.`,
+      specific_gap: "",
+      memory_clue: "",
+      next_step:
+        "Proven. You used to need help with this — not anymore.",
     };
   }
 
@@ -265,20 +370,13 @@ function fallbackGrade(
     };
   }
 
+  // All 5 concepts are handled above; this satisfies the return type.
   return {
     passed: false,
-
-    what_you_got:
-      "Your answer gives Ledger something to work with.",
-
-    specific_gap:
-      `The concept being tested is ${concept.replace("_", " ")}. Explain the reasoning behind your answer.`,
-
-    memory_clue:
-      "Think back to the original bug and what the AI changed to fix it.",
-
-    next_step:
-      "Try again in your own words and explain why your approach works.",
+    what_you_got: "Your answer gives Ledger something to work with.",
+    specific_gap: "Explain the reasoning behind your answer.",
+    memory_clue: "Think back to the original bug and what the AI changed to fix it.",
+    next_step: "Try again in your own words and explain why your approach works.",
   };
 }
 

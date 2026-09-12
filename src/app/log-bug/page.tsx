@@ -1,3 +1,128 @@
 'use client';
-import {useState} from 'react'; import Link from 'next/link'; import {addDebt} from '@/lib/store'; import type {Concept,Debt} from '@/lib/types'; import {CONCEPT_LABELS} from '@/lib/types';
-export default function LogBug(){const [code,setCode]=useState('for i in range(len(items) + 1):\n    print(items[i])');const [error,setError]=useState('IndexError: list index out of range');const [loading,setLoading]=useState(false);const [result,setResult]=useState<any>(null);const submit=async()=>{setLoading(true);setResult(null);try{const r=await fetch('/api/fix',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,error})});const data=await r.json();if(!r.ok)throw new Error(data.error);const debt:Debt={id:crypto.randomUUID(),concept:data.concept as Concept,original_error:error,ai_fix_summary:data.summary,status:'open',created_at:new Date().toISOString()};addDebt(debt);setResult({...data,debtId:debt.id})}catch(e:any){setResult({error:e.message})}finally{setLoading(false)}};return <div className="min-h-screen p-5 md:p-10"><div className="max-w-4xl mx-auto"><Link href="/dashboard" className="text-xs underline">← DASHBOARD</Link><div className="mt-10"><div className="text-[10px] tracking-[.2em] text-[#85827a]">01 / LOG THE HELP</div><h1 className="mt-2 text-4xl font-black tracking-[-.06em]">What did AI just fix?</h1><p className="sans mt-3 text-sm text-[#68665f]">Paste the code and error. Claude identifies the underlying concept and creates a learning-debt entry.</p></div><div className="grid md:grid-cols-2 gap-4 mt-8"><label className="card p-4"><span className="text-[10px] tracking-[.15em]">BUGGY CODE</span><textarea value={code} onChange={e=>setCode(e.target.value)} className="mt-3 w-full h-64 bg-[#f4f3ee] p-3 text-xs outline-none resize-none"/></label><label className="card p-4"><span className="text-[10px] tracking-[.15em]">ERROR / TRACEBACK</span><textarea value={error} onChange={e=>setError(e.target.value)} className="mt-3 w-full h-64 bg-[#f4f3ee] p-3 text-xs outline-none resize-none"/></label></div><button onClick={submit} disabled={loading||!code||!error} className="mt-4 bg-black text-white px-6 py-3 text-xs font-bold disabled:opacity-40">{loading?'ANALYZING…':'ASK CLAUDE →'}</button>{result&&<div className="card mt-8 p-6">{result.error?<div className="text-sm">{result.error}</div>:<><div className="flex items-start justify-between gap-4"><div><div className="text-[10px] tracking-[.15em] text-[#85827a]">LEARNING DEBT CREATED</div><div className="mt-2 text-2xl font-black">{CONCEPT_LABELS[result.concept as Concept]}</div></div><span className="bg-[var(--warning)] px-2 py-1 text-[10px] font-bold">OPEN</span></div><p className="sans mt-5 text-sm">{result.summary}</p><div className="mt-5 bg-[#f4f3ee] p-4"><div className="text-[10px] tracking-[.15em] text-[#85827a]">AI FIX</div><pre className="mt-2 whitespace-pre-wrap text-xs">{result.fix}</pre></div><Link href={`/test/${result.concept}`} className="inline-block mt-5 bg-black text-white px-5 py-3 text-xs font-bold">PROVE THIS SKILL →</Link></>}</div>}</div></div>}
+import { useState } from 'react';
+import Link from 'next/link';
+import { addDebt } from '@/lib/store';
+import type { Concept } from '@/lib/types';
+import { CONCEPT_LABELS } from '@/lib/types';
+
+export default function LogBug() {
+  const [code, setCode] = useState(
+    'for i in range(len(items) + 1):\n    print(items[i])'
+  );
+  const [error, setError] = useState('IndexError: list index out of range');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+
+  const submit = async () => {
+    setLoading(true);
+    setResult(null);
+    try {
+      const r = await fetch('/api/fix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, error }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error);
+
+      const debt = await addDebt({
+        concept: data.concept as Concept,
+        original_error: error,
+        ai_fix_summary: data.summary,
+        status: 'open',
+      });
+
+      setResult({ ...data, debtId: debt.id });
+    } catch (e: any) {
+      setResult({ error: e.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen p-5 md:p-10">
+      <div className="max-w-4xl mx-auto">
+        <Link href="/dashboard" className="text-xs underline">
+          ← DASHBOARD
+        </Link>
+        <div className="mt-10">
+          <div className="text-[10px] tracking-[.2em] text-[#85827a]">
+            01 / LOG THE HELP
+          </div>
+          <h1 className="mt-2 text-4xl font-black tracking-[-.06em]">
+            Copilot just fixed something. Did the skill stick?
+          </h1>
+          <p className="sans mt-3 text-sm text-[#68665f]">
+            Paste the code and error. Claude identifies the underlying
+            concept and opens a debt you can prove — now, or anytime before
+            it matters.
+          </p>
+        </div>
+        <div className="grid md:grid-cols-2 gap-4 mt-8">
+          <label className="card p-4">
+            <span className="text-[10px] tracking-[.15em]">BUGGY CODE</span>
+            <textarea
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className="mt-3 w-full h-64 bg-[#f4f3ee] p-3 text-xs outline-none resize-none"
+            />
+          </label>
+          <label className="card p-4">
+            <span className="text-[10px] tracking-[.15em]">ERROR / TRACEBACK</span>
+            <textarea
+              value={error}
+              onChange={(e) => setError(e.target.value)}
+              className="mt-3 w-full h-64 bg-[#f4f3ee] p-3 text-xs outline-none resize-none"
+            />
+          </label>
+        </div>
+        <button
+          onClick={submit}
+          disabled={loading || !code || !error}
+          className="mt-4 bg-black text-white px-6 py-3 text-xs font-bold disabled:opacity-40"
+        >
+          {loading ? 'ANALYZING…' : 'ASK CLAUDE →'}
+        </button>
+        {result && (
+          <div className="card mt-8 p-6">
+            {result.error ? (
+              <div className="text-sm">{result.error}</div>
+            ) : (
+              <>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-[10px] tracking-[.15em] text-[#85827a]">
+                      LEARNING DEBT OPENED
+                    </div>
+                    <div className="mt-2 text-2xl font-black">
+                      {CONCEPT_LABELS[result.concept as Concept]}
+                    </div>
+                  </div>
+                  <span className="bg-[var(--warning)] px-2 py-1 text-[10px] font-bold">
+                    OPEN
+                  </span>
+                </div>
+                <p className="sans mt-5 text-sm">{result.summary}</p>
+                <div className="mt-5 bg-[#f4f3ee] p-4">
+                  <div className="text-[10px] tracking-[.15em] text-[#85827a]">
+                    AI FIX
+                  </div>
+                  <pre className="mt-2 whitespace-pre-wrap text-xs">
+                    {result.fix}
+                  </pre>
+                </div>
+                <Link
+                  href={`/test/${result.concept}/${result.debtId}`}
+                  className="inline-block mt-5 bg-black text-white px-5 py-3 text-xs font-bold"
+                >
+                  PROVE THIS SKILL →
+                </Link>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

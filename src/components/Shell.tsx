@@ -1,5 +1,91 @@
 'use client';
 import Link from 'next/link';
-import {usePathname} from 'next/navigation';
-const nav=[['/dashboard','Dashboard'],['/log-bug','Log a bug'],['/test/off_by_one','Test me']];
-export function Shell({children}:{children:React.ReactNode}){const path=usePathname();return <div className="min-h-screen md:flex"><aside className="hidden md:flex w-60 border-r border-[var(--line)] bg-[#f2f1eb] p-5 flex-col"><Link href="/dashboard" className="text-2xl font-black tracking-[-.08em]">ledger<span className="text-[#88857c]">_</span></Link><div className="mt-10 text-[10px] tracking-[.18em] text-[#8a887f]">YOUR LEARNING ACCOUNT</div><nav className="mt-3 space-y-1">{nav.map(([href,label])=><Link key={href} href={href} className={`block px-3 py-2 text-sm ${path===href||path.startsWith(href+'/')?'bg-white border border-[var(--line)]':''}`}>{label}</Link>)}</nav><div className="mt-auto text-[10px] leading-4 text-[#8a887f]">AI assistance is allowed.<br/>Independent proof is the point.</div></aside><main className="flex-1 min-w-0"><header className="md:hidden border-b border-[var(--line)] px-5 py-4 flex justify-between"><Link href="/dashboard" className="text-xl font-black">ledger_</Link><Link href="/log-bug" className="text-xs">LOG BUG</Link></header>{children}</main></div>}
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { loadDebts, stats } from '@/lib/store';
+import type { Concept } from '@/lib/types';
+
+const CONCEPTS: Concept[] = [
+  'off_by_one',
+  'null_handling',
+  'scope_error',
+  'type_mismatch',
+  'logic_error',
+];
+
+export function Shell({ children }: { children: React.ReactNode }) {
+  const path = usePathname();
+  const [testHref, setTestHref] = useState('/dashboard');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    loadDebts().then((debts) => {
+      if (cancelled) return;
+
+      const ranked = CONCEPTS.map((concept) => ({
+        concept,
+        s: stats(debts, concept),
+      }))
+        .filter((row) => row.s.focusDebtId)
+        .sort((a, b) => a.s.readiness - b.s.readiness);
+
+      const next = ranked[0];
+      setTestHref(next ? `/test/${next.concept}/${next.s.focusDebtId}` : '/dashboard');
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [path]);
+
+  const nav = [
+    ['/dashboard', 'Dashboard'],
+    ['/log-bug', 'Log a bug'],
+    [testHref, 'Test me'],
+  ] as const;
+
+  return (
+    <div className="min-h-screen md:flex">
+      <aside className="hidden md:flex w-60 border-r border-[var(--line)] bg-[#f2f1eb] p-5 flex-col">
+        <Link href="/dashboard" className="text-2xl font-black tracking-[-.08em]">
+          ledger<span className="text-[#88857c]">_</span>
+        </Link>
+        <div className="mt-10 text-[10px] tracking-[.18em] text-[#8a887f]">
+          YOUR LEARNING ACCOUNT
+        </div>
+        <nav className="mt-3 space-y-1">
+          {nav.map(([href, label]) => (
+            <Link
+              key={label}
+              href={href}
+              className={`block px-3 py-2 text-sm ${
+                path === href || path.startsWith(href + '/')
+                  ? 'bg-white border border-[var(--line)]'
+                  : ''
+              }`}
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
+        <div className="mt-auto text-[10px] leading-4 text-[#8a887f]">
+          Copilot makes you faster.
+          <br />
+          Ledger tells you if you&apos;re getting better.
+        </div>
+      </aside>
+      <main className="flex-1 min-w-0">
+        <header className="md:hidden border-b border-[var(--line)] px-5 py-4 flex justify-between">
+          <Link href="/dashboard" className="text-xl font-black">
+            ledger_
+          </Link>
+          <Link href="/log-bug" className="text-xs">
+            LOG BUG
+          </Link>
+        </header>
+        {children}
+      </main>
+    </div>
+  );
+}
