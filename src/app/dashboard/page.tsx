@@ -1,3 +1,210 @@
-'use client';
-import {useEffect,useState} from 'react'; import Link from 'next/link'; import {ConceptTable} from '@/components/ConceptTable'; import {Metric} from '@/components/Metric'; import {loadDebts} from '@/lib/store'; import type {Debt} from '@/lib/types';
-export default function Dashboard(){const [debts,setDebts]=useState<Debt[]>([]);useEffect(()=>setDebts(loadDebts()),[]);const open=debts.filter(d=>d.status==='open').length;const resolved=debts.filter(d=>d.status==='resolved').length;const readiness=debts.length?Math.round(resolved/debts.length*100):0;return <div className="grid-bg min-h-screen p-5 md:p-10"><div className="max-w-6xl mx-auto"><div className="flex items-end justify-between gap-6"><div><div className="text-[10px] tracking-[.2em] text-[#85827a]">INTERVIEW READINESS / OVERVIEW</div><h1 className="mt-2 text-4xl md:text-5xl font-black tracking-[-.07em]">Know where you stand.</h1><p className="sans mt-3 max-w-xl text-sm text-[#68665f]">AI can accelerate your coding. Ledger measures whether that help became something you can do independently.</p></div><Link href="/log-bug" className="hidden md:block bg-black text-white px-5 py-3 text-xs font-bold">LOG A BUG →</Link></div><div className="grid md:grid-cols-3 gap-4 mt-10"><Metric label="INDEPENDENT READINESS" value={`${readiness}%`} detail="resolved learning debt"/><Metric label="OPEN LEARNING DEBT" value={String(open)} detail="concepts still needing proof"/><Metric label="PROVEN SKILLS" value={String(resolved)} detail="independent passes"/></div><div className="mt-10"><div className="flex justify-between items-end mb-3"><div><div className="text-[10px] tracking-[.18em] text-[#85827a]">SKILL LEDGER</div><h2 className="text-xl font-black mt-1">Where AI help still needs proof</h2></div><Link href="/log-bug" className="text-xs underline">+ ADD ENTRY</Link></div><ConceptTable debts={debts}/></div><div className="mt-10 card p-6 flex flex-col md:flex-row justify-between gap-5"><div><div className="text-[10px] tracking-[.18em] text-[#85827a]">THE LEDGER LOOP</div><div className="mt-2 text-lg font-black">Use AI → log the gap → prove the skill → clear the debt.</div></div><Link href="/log-bug" className="self-start border border-black px-4 py-2 text-xs font-bold">START WITH A BUG →</Link></div></div></div>}
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { loadDebts, stats, type Debt } from "@/lib/store";
+import type { Concept } from "@/lib/types";
+
+const concepts: { key: Concept; label: string }[] = [
+  { key: "off_by_one", label: "Off-by-one" },
+  { key: "null_handling", label: "Null handling" },
+  { key: "scope_error", label: "Scope" },
+  { key: "type_mismatch", label: "Type mismatch" },
+  { key: "logic_error", label: "Logic" },
+];
+
+function getState(independence: number) {
+  if (independence >= 70) {
+    return {
+      label: "Proven",
+      color: "proven",
+      progress: "progress-proven",
+    };
+  }
+
+  if (independence >= 40) {
+    return {
+      label: "Almost there",
+      color: "almost",
+      progress: "progress-almost",
+    };
+  }
+
+  return {
+    label: "Learning",
+    color: "learning",
+    progress: "progress-learning",
+  };
+}
+
+export default function DashboardPage() {
+  const [debts, setDebts] = useState<Debt[]>([]);
+
+  useEffect(() => {
+    setDebts(loadDebts());
+  }, []);
+
+  const rows = concepts
+    .map((concept) => {
+      const result = stats(debts, concept.key);
+
+      return {
+        ...concept,
+        independence: result.readiness,
+        total: result.total,
+        open: result.open,
+        state: getState(result.readiness),
+      };
+    })
+    .sort((a, b) => a.independence - b.independence);
+
+  const total = debts.length;
+  const resolved = debts.filter(
+    (debt) => debt.status === "resolved"
+  ).length;
+
+  const independence = total
+    ? Math.round((resolved / total) * 100)
+    : 0;
+
+  const overall = getState(independence);
+
+  const nextConcept =
+    rows.find((row) => row.open > 0) ?? rows[0];
+
+  return (
+    <main className="min-h-screen bg-[var(--paper)]">
+      <div className="mx-auto max-w-6xl px-7 py-7 md:px-12 md:py-10">
+
+        <header className="flex items-center justify-between border-b border-[var(--line)] pb-5">
+          <Link
+            href="/dashboard"
+            className="ledger-display text-3xl md:text-4xl"
+          >
+            Ledger
+          </Link>
+
+          <Link
+            href="/log-bug"
+            className="text-base font-semibold text-[var(--ink)] underline decoration-[var(--line)] underline-offset-4 transition hover:decoration-[var(--ink)]"
+          >
+            Log a bug
+          </Link>
+        </header>
+
+        <section className="max-w-4xl pb-20 pt-20 md:pb-24 md:pt-24">
+          <p className="ledger-display text-6xl leading-[0.92] md:text-8xl">
+            Know what you know.
+          </p>
+
+          <p className="mt-8 max-w-2xl text-xl leading-8 md:text-2xl md:leading-9">
+            Use AI to code faster. Know which skills are actually yours.
+          </p>
+
+          <div className="mt-16 md:mt-20">
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-[var(--muted)]">
+              Independence
+            </p>
+
+            <p
+              className={`ledger-display mt-1 text-8xl leading-none md:text-9xl ${overall.color}`}
+            >
+              {independence}%
+            </p>
+
+            <p className="mt-6 max-w-xl text-lg leading-7 text-[var(--muted)]">
+              You&apos;re making progress. Here&apos;s where to focus next.
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <div className="flex items-end justify-between border-b border-[var(--ink)] pb-4">
+            <h2 className="ledger-serif text-3xl md:text-4xl">
+              Your skills
+            </h2>
+
+            <span className="hidden text-sm text-[var(--muted)] md:block">
+              Lowest independence first
+            </span>
+          </div>
+
+          <div>
+            {rows.map((row) => (
+              <div
+                key={row.key}
+                className="border-b border-[var(--line)] py-9 md:py-10"
+              >
+                <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-start">
+
+                  <div>
+                    <h3 className="text-2xl font-semibold tracking-tight md:text-3xl">
+                      {row.label}
+                    </h3>
+
+                    {row.total >= 5 && (
+                      <p className="mt-3 max-w-xl text-base leading-7 text-[var(--muted)]">
+                        You&apos;ve hit this pattern {row.total} times.
+                        <br />
+                        Let&apos;s turn it into a skill you own.
+                      </p>
+                    )}
+
+                    <p
+                      className={`mt-5 text-base font-bold ${row.state.color}`}
+                    >
+                      {row.state.label}
+                    </p>
+                  </div>
+
+                  <div className="md:min-w-[150px] md:text-right">
+                    <p
+                      className={`ledger-display text-5xl md:text-6xl ${row.state.color}`}
+                    >
+                      {row.independence}%
+                    </p>
+
+                    {row.open > 0 ? (
+                      <Link
+                        href={`/test/${row.key}`}
+                        className={`mt-3 inline-block text-base font-semibold ${row.state.color} underline decoration-current underline-offset-4 transition-opacity hover:opacity-60`}
+                      >
+                        Practice this →
+                      </Link>
+                    ) : (
+                      <span className="mt-3 inline-block text-base font-semibold proven">
+                        Proven
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="progress-track mt-7">
+                  <div
+                    className={row.state.progress}
+                    style={{
+                      width: `${row.independence}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {nextConcept && (
+            <div className="pb-20 pt-10">
+              <Link
+                href={`/test/${nextConcept.key}`}
+                className="ledger-button text-base"
+              >
+                {nextConcept.independence < 40
+                  ? `Start ${nextConcept.label.toLowerCase()} →`
+                  : `Practice ${nextConcept.label.toLowerCase()} →`}
+              </Link>
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}

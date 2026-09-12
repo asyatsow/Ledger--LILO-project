@@ -1,42 +1,111 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import questions from "@/lib/questions.json";
-import { loadDebts, resolveDebt } from "@/lib/store";
-import type { Concept, Debt } from "@/lib/types";
-import { CONCEPT_LABELS } from "@/lib/types";
+import { useParams, useRouter } from "next/navigation";
+import questionBank from "@/lib/questions.json";
+import {
+  loadDebts,
+  resolveDebt,
+} from "@/lib/store";
+import type { Debt } from "@/lib/types";
 
-export default function Test({
-  params,
-}: {
-  params: Promise<{ concept: string }>;
-}) {
-  const [concept, setConcept] = useState<Concept>("off_by_one");
+const CONCEPTS = [
+  "off_by_one",
+  "null_handling",
+  "scope_error",
+  "type_mismatch",
+  "logic_error",
+] as const;
+
+type Concept = (typeof CONCEPTS)[number];
+
+type Question = {
+  id: string;
+  prompt: string;
+  expected_understanding: string;
+};
+
+type GradeResult = {
+  passed: boolean;
+  what_you_got: string;
+  specific_gap: string;
+  memory_clue: string;
+  next_step: string;
+};
+
+function formatConcept(concept: string) {
+  return concept
+    .split("_")
+    .map(
+      (word) =>
+        word.charAt(0).toUpperCase() + word.slice(1)
+    )
+    .join(" ");
+}
+
+export default function TestConceptPage() {
+  const params = useParams();
+  const router = useRouter();
+
+  const conceptParam = String(params.concept || "");
+
+  const concept = CONCEPTS.includes(
+    conceptParam as Concept
+  )
+    ? (conceptParam as Concept)
+    : null;
+
+  const [entry, setEntry] = useState<Debt | null>(null);
+  const [question, setQuestion] =
+    useState<Question | null>(null);
+
   const [answer, setAnswer] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [debt, setDebt] = useState<Debt | null>(null);
+  const [result, setResult] =
+    useState<GradeResult | null>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
-    params.then((p) => {
-      const c = p.concept as Concept;
-      setConcept(c);
+    if (!concept) {
+      router.replace("/dashboard");
+      return;
+    }
 
-      const d = loadDebts().find(
-        (x) => x.concept === c && x.status === "open"
-      );
+    const entries = loadDebts();
 
-      setDebt(d || null);
-    });
-  }, [params]);
+    const openEntry = entries.find(
+      (item) =>
+        item.concept === concept &&
+        item.status === "open"
+    );
 
-  const q = (questions as any)[concept]?.[0];
+    setEntry(openEntry || null);
 
-  const submit = async () => {
-    if (!debt || !answer || !q) return;
+    const questions =
+      questionBank[
+        concept as keyof typeof questionBank
+      ] as readonly Question[];
 
-    setLoading(true);
+    if (questions?.length) {
+      setQuestion(questions[0]);
+    }
+
+    setLoading(false);
+  }, [concept, router]);
+
+  async function handleSubmit() {
+    if (
+      !answer.trim() ||
+      !entry ||
+      !question ||
+      !concept
+    ) {
+      return;
+    }
+
+    setChecking(true);
+    setResult(null);
 
     try {
       const response = await fetch("/api/grade", {
@@ -45,122 +114,321 @@ export default function Test({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          entry_id: entry.id,
           concept,
-          question_id: q.id,
+          question_id: question.id,
           user_answer: answer,
-          entry_id: debt.id,
+          original_error: entry.original_error,
+          ai_fix_summary: entry.ai_fix_summary,
         }),
       });
 
       const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Unable to check your answer."
+        );
+      }
+
       setResult(data);
 
-      if (data.pass) {
-        resolveDebt(debt.id);
+      if (data.passed) {
+        resolveDebt(entry.id);
 
-        setDebt({
-          ...debt,
+        setEntry({
+          ...entry,
           status: "resolved",
-          resolved_at: new Date().toISOString(),
         });
       }
+    } catch {
+      setResult({
+        passed: false,
+        what_you_got:
+          "We couldn't check your answer right now.",
+        specific_gap:
+          "Your answer hasn't been evaluated yet.",
+        memory_clue:
+          "Think back to the original bug and the idea behind the AI fix.",
+        next_step:
+          "Try again when Ledger can check your answer.",
+      });
     } finally {
-      setLoading(false);
+      setChecking(false);
     }
-  };
+  }
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-white px-6 py-12 text-black">
+        <div className="mx-auto max-w-3xl">
+          <p className="text-sm text-neutral-500">
+            Loading...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!concept || !question) {
+    return null;
+  }
+
+  if (!entry) {
+    return (
+      <main className="min-h-screen bg-white px-6 py-12 text-black">
+        <div className="mx-auto max-w-3xl">
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="mb-10 text-sm text-neutral-500 hover:text-black"
+          >
+            ← Back to dashboard
+          </button>
+
+          <div className="border border-neutral-200 p-8">
+            <h1 className="text-2xl font-semibold">
+              Nothing to prove here
+            </h1>
+
+            <p className="mt-3 text-neutral-600">
+              You don't have an open{" "}
+              {formatConcept(concept)} item right now.
+            </p>
+
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="mt-6 bg-black px-5 py-3 text-sm font-medium text-white hover:bg-neutral-800"
+            >
+              Back to dashboard
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const passed = result?.passed === true;
 
   return (
-    <div className="min-h-screen p-5 md:p-10">
-      <div className="max-w-3xl mx-auto">
-        <Link href="/dashboard" className="text-xs underline">
-          ← DASHBOARD
-        </Link>
+    <main className="min-h-screen bg-white text-black">
+      <div className="mx-auto max-w-3xl px-6 py-10">
 
-        <div className="mt-10">
-          <div className="text-[10px] tracking-[.2em] text-[#85827a]">
-            02 / PROVE THE SKILL
+        <nav className="mb-10 flex items-center justify-between border-b border-neutral-200 pb-5">
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="text-lg font-semibold tracking-tight"
+          >
+            ledger_
+          </button>
+
+          <div className="flex gap-6 text-sm text-neutral-500">
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="hover:text-black"
+            >
+              Dashboard
+            </button>
+
+            <button
+              onClick={() => router.push("/log-bug")}
+              className="hover:text-black"
+            >
+              Log a bug
+            </button>
+
+            <span className="text-black">
+              Test me
+            </span>
           </div>
+        </nav>
 
-          <h1 className="mt-2 text-4xl font-black tracking-[-.06em]">
-            {CONCEPT_LABELS[concept]}
-          </h1>
+        <button
+          onClick={() => router.push("/dashboard")}
+          className="mb-8 text-sm text-neutral-500 hover:text-black"
+        >
+          ← Back to dashboard
+        </button>
 
-          <p className="sans mt-3 text-sm text-[#68665f]">
-            A fresh question tests the same concept. No AI assistance here.
-            Your answer is the proof.
+        {/* AI OFF BANNER */}
+
+        <div className="mb-8 border border-black bg-black px-5 py-4 text-white">
+          <p className="text-xs font-semibold tracking-[0.18em]">
+            AI ASSISTANCE: OFF
+          </p>
+
+          <p className="mt-1 text-sm text-neutral-300">
+            Independent attempt required
           </p>
         </div>
 
-        {!debt ? (
-          <div className="card mt-8 p-6">
-            No open learning debt for this concept.{" "}
-            <Link className="underline" href="/log-bug">
-              Log a bug first.
-            </Link>
-          </div>
-        ) : (
+        {/* QUESTION */}
+
+        {!result && (
           <>
-            <div className="mt-8 bg-black text-white p-5 text-xs">
-              <span className="font-bold">AI ASSISTANCE: OFF</span>
-              <span className="ml-3 text-[#aaa]">
-                Independent attempt required
-              </span>
-            </div>
+            <p className="text-sm font-medium text-neutral-500">
+              Prove this skill
+            </p>
 
-            <div className="card mt-4 p-6">
-              <div className="text-[10px] tracking-[.15em] text-[#85827a]">
-                TRANSFER QUESTION
-              </div>
+            <h1 className="mt-2 text-4xl font-semibold tracking-tight">
+              {formatConcept(concept)}
+            </h1>
 
-              <p className="sans mt-4 text-base leading-7">
-                {q?.prompt}
+            <p className="mt-4 max-w-2xl text-neutral-600">
+              You used AI to solve a related problem earlier.
+              Now show that the underlying skill stuck.
+            </p>
+
+            <section className="mt-10">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
+                Transfer question
               </p>
 
+              <div className="mt-3 border border-neutral-200 bg-neutral-50 p-6">
+                <p className="text-lg leading-8">
+                  {question.prompt}
+                </p>
+              </div>
+            </section>
+
+            <section className="mt-8">
+              <label
+                htmlFor="answer"
+                className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500"
+              >
+                Your answer
+              </label>
+
               <textarea
+                id="answer"
                 value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                placeholder="Explain your reasoning…"
-                className="mt-6 w-full h-44 bg-[#f4f3ee] p-4 text-sm outline-none resize-none"
+                onChange={(event) =>
+                  setAnswer(event.target.value)
+                }
+                disabled={checking}
+                placeholder="Explain it in your own words..."
+                className="mt-3 min-h-[180px] w-full resize-y border border-neutral-300 px-4 py-4 text-base outline-none focus:border-black disabled:bg-neutral-100"
               />
 
               <button
-                onClick={submit}
-                disabled={loading || !answer}
-                className="mt-4 bg-black text-white px-6 py-3 text-xs font-bold disabled:opacity-40"
+                onClick={handleSubmit}
+                disabled={!answer.trim() || checking}
+                className="mt-4 bg-black px-6 py-3 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {loading ? "GRADING…" : "SUBMIT FOR PROOF →"}
+                {checking
+                  ? "Checking your answer..."
+                  : "Check my answer"}
               </button>
-            </div>
-
-            {result && (
-              <div
-                className={`card mt-5 p-6 ${
-                  result.pass
-                    ? "bg-[var(--accent)]"
-                    : "bg-[var(--warning)]"
-                }`}
-              >
-                <div className="text-2xl font-black">
-                  {result.pass ? "DEBT PAID" : "NOT YET"}
-                </div>
-
-                <p className="sans mt-2 text-sm">
-                  {result.feedback}
-                </p>
-
-                {result.pass && (
-                  <Link
-                    href="/dashboard"
-                    className="inline-block mt-4 underline text-xs font-bold"
-                  >
-                    VIEW UPDATED READINESS →
-                  </Link>
-                )}
-              </div>
-            )}
+            </section>
           </>
         )}
+
+        {/* ONE FEEDBACK BOX */}
+
+        {result && (
+          <section className="mt-6">
+            <div
+              className={`border p-7 ${
+                passed
+                  ? "border-black bg-black text-white"
+                  : "border-neutral-200 bg-neutral-50 text-black"
+              }`}
+            >
+              <p
+                className={`text-xs font-semibold uppercase tracking-[0.16em] ${
+                  passed
+                    ? "text-neutral-300"
+                    : "text-neutral-500"
+                }`}
+              >
+                {passed
+                  ? "Skill proven"
+                  : "Almost there"}
+              </p>
+
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+                {passed
+                  ? "You know this one."
+                  : "You're getting there."}
+              </h2>
+
+              <div
+                className={`mt-6 space-y-5 text-base leading-7 ${
+                  passed
+                    ? "text-neutral-200"
+                    : "text-neutral-700"
+                }`}
+              >
+                {!passed && result.what_you_got && (
+                  <p>{result.what_you_got}</p>
+                )}
+
+                {!passed && result.specific_gap && (
+                  <p>{result.specific_gap}</p>
+                )}
+
+                {!passed && result.memory_clue && (
+                  <p>
+                    <span className="font-semibold text-black">
+                      Think back:
+                    </span>{" "}
+                    {result.memory_clue}
+                  </p>
+                )}
+
+                {passed && (
+                  <p>
+                    Proven. You used to need help with this —
+                    not anymore.
+                  </p>
+                )}
+
+                {result.next_step && (
+                  <p
+                    className={
+                      passed
+                        ? "text-neutral-200"
+                        : "text-black"
+                    }
+                  >
+                    {result.next_step}
+                  </p>
+                )}
+              </div>
+
+              {passed ? (
+                <div className="mt-8 flex flex-wrap gap-3">
+                  <button
+                    onClick={() => router.push("/dashboard")}
+                    className="bg-white px-5 py-3 text-sm font-medium text-black hover:bg-neutral-200"
+                  >
+                    See my progress
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setResult(null);
+                      setAnswer("");
+                    }}
+                    className="border border-neutral-600 px-5 py-3 text-sm font-medium text-white hover:bg-neutral-800"
+                  >
+                    Practice again
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setResult(null);
+                    setAnswer("");
+                  }}
+                  className="mt-8 bg-black px-5 py-3 text-sm font-medium text-white hover:bg-neutral-800"
+                >
+                  Try again
+                </button>
+              )}
+            </div>
+          </section>
+        )}
       </div>
-    </div>
+    </main>
   );
 }

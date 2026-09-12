@@ -1,3 +1,167 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Karla:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
-:root{--ink:#11110f;--muted:#73716b;--line:#dfddd6;--paper:#f7f6f1;--card:#fffefa;--accent:#e7f0df;--warning:#f2e8bf;--danger:#efd9d4;}
-*{box-sizing:border-box} html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink)} body{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace}.sans{font-family:Inter,ui-sans-serif,system-ui,sans-serif} a{text-decoration:none;color:inherit} button,input,textarea{font:inherit}.grid-bg{background-image:linear-gradient(#e9e7df 1px,transparent 1px),linear-gradient(90deg,#e9e7df 1px,transparent 1px);background-size:28px 28px}.card{background:var(--card);border:1px solid var(--line);box-shadow:0 2px 0 rgba(17,17,15,.04)}
+
+:root {
+  --paper: #f5f3ed;
+  --surface: #fbfaf6;
+  --ink: #191814;
+  --muted: #706d64;
+  --line: #d8d4ca;
+
+  --learning: #4b72a8;
+  --learning-soft: #edf2f8;
+
+  --almost: #b48722;
+  --almost-soft: #f8f1dc;
+
+  --proven: #43805d;
+  --proven-soft: #eaf2ec;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--paper);
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Karla", Arial, Helvetica, sans-serif;
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: #ded9cc;
+  color: var(--ink);
+}
+
+/* Ledger's educational/editorial voice */
+.ledger-display {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+}
+
+.ledger-serif {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 500;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.learning {
+  color: var(--learning);
+}
+
+.learning-surface {
+  background: var(--learning-soft);
+  border-color: var(--learning);
+}
+
+.almost {
+  color: var(--almost);
+}
+
+.almost-surface {
+  background: var(--almost-soft);
+  border-color: var(--almost);
+}
+
+.proven {
+  color: var(--proven);
+}
+
+.proven-surface {
+  background: var(--proven-soft);
+  border-color: var(--proven);
+}
+
+.progress-track {
+  height: 6px;
+  width: 100%;
+  background: #e5e2da;
+  overflow: hidden;
+}
+
+.progress-learning {
+  height: 100%;
+  background: var(--learning);
+}
+
+.progress-almost {
+  height: 100%;
+  background: var(--almost);
+}
+
+.progress-proven {
+  height: 100%;
+  background: var(--proven);
+}
+
+.ledger-input {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  outline: none;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    background 150ms ease;
+}
+
+.ledger-input:focus {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(25, 24, 20, 0.06);
+}
+
+.ledger-input::placeholder {
+  color: #96928a;
+}
+
+.ledger-button {
+  display: inline-flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink);
+  color: #fff;
+  padding: 0 22px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition:
+    transform 120ms ease,
+    opacity 120ms ease;
+}
+
+.ledger-button:hover {
+  opacity: 0.88;
+}
+
+.ledger-button:active {
+  transform: translateY(1px);
+}
