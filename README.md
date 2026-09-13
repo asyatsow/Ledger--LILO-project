@@ -4,7 +4,7 @@
 
 AI can get you unstuck. Ledger helps you know what stuck with you.
 
-Built in 12 hours for the LILO Summer Academy Hackathon 2026 (Track 2: Leverage AI).
+CANVA SLIDES DISPLAYING OUR FULL SLIDES AND PUTS EVERYTHING IN CONTEXT FOUND HERE: https://canva.link/zsevh94jbtrvfb8
 
 ---
 
